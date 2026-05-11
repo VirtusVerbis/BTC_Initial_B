@@ -15,7 +15,7 @@ import { computeShutterLadderRects } from './parallaxShutterLayout'
  * [`parallaxShutterLayout`](./parallaxShutterLayout.ts) seam band; non-ladder bands use layout defaults + CSS flex.
  * Default x/y per layer: parallaxPrototypeLayerLayout.ts (POSITION_DEFAULT + POSITION_ADJUST).
  * **Pitch / shutter**: ladder strips use `computeShutterLadderRects(pitch)` (constant seam band, blues vs greens share height).
- * Drag **up** → downhill (`pitch > 0`); drag **down** → uphill (`pitch < 0`). **Pointer release** eases `pitch` back to 0 (spring).
+ * Drag **up** → uphill (`pitch < 0`); drag **down** → downhill (`pitch > 0`). **Pointer release** eases `pitch` back to 0 (spring).
  * Spec: web/docs/stage-parallax-driving.md
  */
 
@@ -163,8 +163,8 @@ export const ParallaxDrivePrototype = () => {
     if (!s || e.pointerId !== s.pointerId) return
     const scale = readStageScaleFromEventTarget(e.currentTarget)
     const deltaRefPx = (e.clientY - s.startClientY) / scale
-    // Drag up (negative deltaRefPx) → positive pitch (downhill shutter).
-    const next = Math.max(-1, Math.min(1, s.startPitch - deltaRefPx / DRAG_TO_PITCH_REF_PX))
+    // Drag down (positive deltaRefPx) → positive pitch (downhill shutter).
+    const next = Math.max(-1, Math.min(1, s.startPitch + deltaRefPx / DRAG_TO_PITCH_REF_PX))
     pitchRef.current = next
     setPitch(next)
   }, [])

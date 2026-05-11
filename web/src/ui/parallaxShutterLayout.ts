@@ -84,7 +84,7 @@ export const SHUTTER_LADDER_NEUTRAL_RECTS: Record<ParallaxLadderStripId, Shutter
   buildShutterLadderRectsAtBlueShare(NEUTRAL_BLUE_HEIGHT_SHARE)
 
 /**
- * Full shutter sweep: `pitch ∈ [-1, 1]`, clamped. Drag convention matches prototype (up → positive).
+ * Full shutter sweep: `pitch ∈ [-1, 1]`, clamped. Drag convention matches prototype (pointer down → positive pitch).
  */
 export function computeShutterLadderRects(pitch: number): Record<ParallaxLadderStripId, ShutterLadderRect> {
   const p = Math.max(-1, Math.min(1, pitch))
