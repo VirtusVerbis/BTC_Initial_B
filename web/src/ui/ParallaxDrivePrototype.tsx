@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
-import { HORIZONTAL_OVERFLOW_PX } from './parallaxPrototypeGeometry'
+import { lateralTranslateRefPx } from './parallaxPrototypeGeometry'
 import {
   getParallaxPrototypeLayerPosition,
   PARALLAX_LADDER_STRIP_IDS,
@@ -16,6 +16,7 @@ import { computeShutterLadderRects } from './parallaxShutterLayout'
  * Default x/y per layer: parallaxPrototypeLayerLayout.ts (POSITION_DEFAULT + POSITION_ADJUST).
  * **Pitch / shutter**: ladder strips use `computeShutterLadderRects(pitch)` (constant seam band, blues vs greens share height).
  * Drag **up** → uphill (`pitch < 0`); drag **down** → downhill (`pitch > 0`). **Pointer release** eases `pitch` back to 0 (spring).
+ * Drag **left** → positive `lateral`; drag **right** → negative `lateral` → BG1–BG6 `translateX` (differential parallax). Release eases `lateral` to 0 with the same spring as pitch.
  * Spec: web/docs/stage-parallax-driving.md
  */
 
@@ -64,33 +65,70 @@ const LADDER_LAYERS: readonly { readonly dataLayer: ParallaxLadderStripId; reado
     color: ladderStripColor(dataLayer),
   }))
 
+/** 2× stage column width; margin centers strip on parent (see PARALLAX_STRIP_* ref px). */
 const overscanFlexStyle = {
-  width: `calc(100% + ${HORIZONTAL_OVERFLOW_PX}px)`,
-  marginLeft: `${-HORIZONTAL_OVERFLOW_PX / 2}px`,
+  width: '200%',
+  marginLeft: '-50%',
 } satisfies CSSProperties
+
+const ParallaxBgCenterGuide = () => (
+  <div
+    aria-hidden
+    style={{
+      position: 'absolute',
+      left: '50%',
+      top: 0,
+      bottom: 0,
+      width: 2,
+      marginLeft: -1,
+      background: 'rgba(255, 220, 60, 0.88)',
+      boxShadow: '0 0 6px rgba(0, 0, 0, 0.45)',
+      pointerEvents: 'none',
+      zIndex: 1,
+    }}
+  />
+)
 
 const WideBand = ({
   color,
   zIndex,
   dataLayer,
+  translateXPx = 0,
+  showCenterGuide = false,
 }: {
   color: string
   zIndex: number
   dataLayer: string
+  translateXPx?: number
+  showCenterGuide?: boolean
 }) => (
   <div
     className="parallax-prototype-band"
-    style={{ ...overscanFlexStyle, backgroundColor: color, zIndex }}
+    style={{
+      ...overscanFlexStyle,
+      backgroundColor: color,
+      zIndex,
+      position: 'relative',
+      transform: translateXPx !== 0 ? `translateX(${translateXPx}px)` : 'none',
+    }}
     data-layer={dataLayer}
     aria-hidden
-  />
+  >
+    {showCenterGuide ? <ParallaxBgCenterGuide /> : null}
+  </div>
 )
+
+const isBgLadderStrip = (id: ParallaxLadderStripId): id is 'bg-5' | 'bg-4' | 'bg-3' | 'bg-2' | 'bg-1' =>
+  id.startsWith('bg-')
 
 /** Set `false` to disable the full-stage vertical drag test layer when design matures. */
 const PARALLAX_HORIZON_DRAG_ENABLED = true
 
 /** Reference-px drag distance for full `pitch` sweep from 0 to 1 (or 0 to -1). */
 const DRAG_TO_PITCH_REF_PX = 480
+
+/** Reference-px drag distance for full `lateral` sweep from 0 to 1 (or 0 to -1). */
+const DRAG_TO_LATERAL_REF_PX = 480
 
 /** Spring decay per second (exponent); higher = snappier return to neutral. */
 const PITCH_SPRING_DECAY_PER_S = 18
@@ -108,6 +146,10 @@ export const ParallaxDrivePrototype = () => {
   const pitchRef = useRef(0)
   pitchRef.current = pitch
 
+  const [lateral, setLateral] = useState(0)
+  const lateralRef = useRef(0)
+  lateralRef.current = lateral
+
   const springRafRef = useRef<number | null>(null)
 
   const cancelSpring = useCallback(() => {
@@ -124,11 +166,15 @@ export const ParallaxDrivePrototype = () => {
       const dt = Math.min(0.045, (now - last) / 1000)
       last = now
       const decay = Math.exp(-PITCH_SPRING_DECAY_PER_S * dt)
-      const p = pitchRef.current * decay
-      const next = Math.abs(p) < 0.002 ? 0 : p
-      pitchRef.current = next
-      setPitch(next)
-      if (next !== 0) {
+      let p = pitchRef.current * decay
+      let l = lateralRef.current * decay
+      if (Math.abs(p) < 0.002) p = 0
+      if (Math.abs(l) < 0.002) l = 0
+      pitchRef.current = p
+      lateralRef.current = l
+      setPitch(p)
+      setLateral(l)
+      if (p !== 0 || l !== 0) {
         springRafRef.current = requestAnimationFrame(tick)
       } else {
         springRafRef.current = null
@@ -144,7 +190,9 @@ export const ParallaxDrivePrototype = () => {
   const dragSessionRef = useRef<{
     pointerId: number
     startClientY: number
+    startClientX: number
     startPitch: number
+    startLateral: number
   } | null>(null)
 
   const onPitchDragPointerDown = useCallback((e: PointerEvent<HTMLDivElement>) => {
@@ -154,7 +202,9 @@ export const ParallaxDrivePrototype = () => {
     dragSessionRef.current = {
       pointerId: e.pointerId,
       startClientY: e.clientY,
+      startClientX: e.clientX,
       startPitch: pitchRef.current,
+      startLateral: lateralRef.current,
     }
   }, [cancelSpring])
 
@@ -162,11 +212,17 @@ export const ParallaxDrivePrototype = () => {
     const s = dragSessionRef.current
     if (!s || e.pointerId !== s.pointerId) return
     const scale = readStageScaleFromEventTarget(e.currentTarget)
-    const deltaRefPx = (e.clientY - s.startClientY) / scale
-    // Drag down (positive deltaRefPx) → positive pitch (downhill shutter).
-    const next = Math.max(-1, Math.min(1, s.startPitch + deltaRefPx / DRAG_TO_PITCH_REF_PX))
-    pitchRef.current = next
-    setPitch(next)
+    const deltaYRefPx = (e.clientY - s.startClientY) / scale
+    // Drag down (positive deltaYRefPx) → positive pitch (downhill shutter).
+    const nextPitch = Math.max(-1, Math.min(1, s.startPitch + deltaYRefPx / DRAG_TO_PITCH_REF_PX))
+    pitchRef.current = nextPitch
+    setPitch(nextPitch)
+
+    const deltaXRefPx = (e.clientX - s.startClientX) / scale
+    // Inverted X: drag left (negative deltaXRefPx) → positive lateral.
+    const nextLateral = Math.max(-1, Math.min(1, s.startLateral - deltaXRefPx / DRAG_TO_LATERAL_REF_PX))
+    lateralRef.current = nextLateral
+    setLateral(nextLateral)
   }, [])
 
   const onPitchDragPointerUp = useCallback(
@@ -179,7 +235,7 @@ export const ParallaxDrivePrototype = () => {
         /* already released */
       }
       dragSessionRef.current = null
-      if (Math.abs(pitchRef.current) > 0.002) {
+      if (Math.abs(pitchRef.current) > 0.002 || Math.abs(lateralRef.current) > 0.002) {
         startSpringToZero()
       }
     },
@@ -208,7 +264,7 @@ export const ParallaxDrivePrototype = () => {
             inset: 0,
             zIndex: 14,
             touchAction: 'none',
-            cursor: 'ns-resize',
+            cursor: 'move',
             pointerEvents: 'auto',
           }}
           aria-hidden
@@ -218,6 +274,8 @@ export const ParallaxDrivePrototype = () => {
       {LADDER_LAYERS.map((layer, layerIndex) => {
         const r = shutterRectsById[layer.dataLayer]!
         const bottomPx = REFERENCE_HEIGHT - r.yPx - r.heightPx
+        const bgLateral = isBgLadderStrip(layer.dataLayer)
+        const txPx = bgLateral ? lateralTranslateRefPx(lateral, layer.dataLayer) : 0
         return (
           <div
             key={layer.dataLayer}
@@ -228,20 +286,28 @@ export const ParallaxDrivePrototype = () => {
               bottom: `${bottomPx}px`,
               width: `${r.widthPx}px`,
               height: `${r.heightPx}px`,
-              transform: 'none',
+              transform: txPx !== 0 ? `translateX(${txPx}px)` : 'none',
               boxSizing: 'border-box',
               backgroundColor: layer.color,
               zIndex: Z_LADDER_BASE + layerIndex,
             }}
             data-layer={layer.dataLayer}
             aria-hidden
-          />
+          >
+            {bgLateral ? <ParallaxBgCenterGuide /> : null}
+          </div>
         )
       })}
 
       <div className="parallax-prototype-column">
         <div className="parallax-prototype-zone-bg6 parallax-prototype-bg-backdrop">
-          <WideBand color={bgBlue(6)} zIndex={0} dataLayer="bg-6" />
+          <WideBand
+            color={bgBlue(6)}
+            zIndex={0}
+            dataLayer="bg-6"
+            translateXPx={lateralTranslateRefPx(lateral, 'bg-6')}
+            showCenterGuide
+          />
         </div>
 
         <div className="parallax-prototype-zone-bg-horizon parallax-prototype-bg-horizon" aria-hidden />
