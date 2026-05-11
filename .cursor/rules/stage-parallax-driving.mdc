@@ -1,0 +1,22 @@
+---
+description: Parallax scenic-drive stage — layer counts, road/hill behavior, car draw order, overlay on top
+globs:
+  - web/src/**/*
+  - web/docs/**/*
+alwaysApply: false
+---
+
+# Scenic drive / parallax stage
+
+Canonical detail: **[web/docs/stage-parallax-driving.md](web/docs/stage-parallax-driving.md)**. Read it before changing stage composition, z-order, or parallax/road behavior.
+
+## Invariants
+
+- **Background**: six parallax layers; lateral motion tied to steering / yaw.
+- **Road**: at least six depth bands; **scale** toward horizon; **vertical offset** from one **shared** hill profile over distance (coherent seams).
+- **Cars**: two racers minimum, third later; **one cars stage**, **sorted each frame by depth** (not three fixed global “ahead/current/behind” texture layers only).
+- **Overlay / HUD**: drawn **last**; keep gameplay world layers **below** overlay z-order (`web/src/index.css`, overlay at 20) unless the user explicitly requests a HUD/stacking change.
+
+## Conflict rule
+
+When editing `Stage` children (e.g. [web/src/App.tsx](web/src/App.tsx)), scene z-index, or overlay placement, follow the doc above. Do not move gameplay sprites above the HUD without explicit approval.

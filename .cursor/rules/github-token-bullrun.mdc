@@ -1,0 +1,31 @@
+---
+description: GitHub auth (GITHUB_TOKEN_BULLRUN) and VirtusVerbis upstream reference for Bull Run
+alwaysApply: true
+---
+
+# GitHub token and upstream reference
+
+## Canonical credential
+
+- This workspace expects a **user/system environment variable** named **`GITHUB_TOKEN_BULLRUN`** for GitHub API and authenticated Git operations.
+- Do **not** assume **`GITHUB_TOKEN`** is set unless the user has mapped it for the session.
+
+## Tool compatibility (PowerShell on Windows)
+
+- Many tools (`gh`, some SDKs, scripts) read **`GITHUB_TOKEN`** only.
+- When GitHub auth is required, use **`GITHUB_TOKEN_BULLRUN`** by mapping for the session or for a single command chain, for example:
+
+```powershell
+$env:GITHUB_TOKEN = $env:GITHUB_TOKEN_BULLRUN
+```
+
+- **Never** echo, log, commit, or paste the token value. Do not store tokens in repo files, rules, or `.env` committed to git.
+
+## Core code reference
+
+- When checking behavior, patterns, or parity with the VirtusVerbis web port, prefer the public reference repo: **https://github.com/VirtusVerbis/BTC_Punch_Up_Web_Port**
+- Use authenticated GitHub access (via the variables above) when rate limits or non-public forks require it; otherwise public reads are fine.
+
+## If the variable is missing
+
+- Ask the user to set **`GITHUB_TOKEN_BULLRUN`** in Windows user environment variables, then restart the terminal and Cursor so new processes inherit it.

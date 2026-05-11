@@ -1,9 +1,18 @@
 # Environment and secrets
+# Never commit PAT values (e.g. GITHUB_TOKEN_BULLRUN); use OS/user environment variables only.
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+*.ppk
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+.secrets/
+token.txt
+github_token.txt
 
 # Python
 __pycache__/
@@ -33,6 +42,7 @@ ENV/
 # Testing / coverage
 .pytest_cache/
 .coverage
+coverage/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
@@ -46,20 +56,27 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-dist/
+*.tsbuildinfo
 .next/
 out/
+
+# Logs
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
 Desktop.ini
+*.stackdump
 
 # Editors / IDE
 .idea/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+# Local Cursor JSON overrides (may contain API keys / tokens); keep .cursor/rules/ tracked
+.cursor/*.local.json
 *.swp
 *.swo
 *~

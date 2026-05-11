@@ -1,0 +1,590 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.3;
+  font-weight: 400;
+  color: #f6f0da;
+  background: #07070c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #27223f 0%, #09080f 55%, #060609 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* padding: 1rem; */
+  padding: 1px 1rem 1rem;
+  position: relative;
+}
+
+.app-layout {
+  position: relative;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.stage-anchor {
+  display: flex;
+  justify-content: center;
+}
+
+.stage-shell {
+  flex-shrink: 0;
+}
+
+.stage-scale-outer {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 2px solid #f2ba49;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0a0812;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  background: #0a0812;
+}
+
+.scene-placeholder {
+  position: absolute;
+  inset: 0;
+  background: #0a0812;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Parallax drive prototype: FG ~33.33%, overlap reserve calc(50%−FG)=33–50%, BG horizon 16% (50–66%), BG6 remainder ~34% (66–100%) */
+.parallax-prototype-root {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.parallax-prototype-column {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.parallax-prototype-zone-bg6,
+.parallax-prototype-zone-bg-horizon,
+.parallax-prototype-zone-overlap-reserve,
+.parallax-prototype-zone-fg {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.parallax-prototype-zone-bg6 {
+  flex: 0 0 calc(100% - 50% - 16%);
+}
+
+.parallax-prototype-zone-bg-horizon {
+  flex: 0 0 16%;
+}
+
+.parallax-prototype-zone-overlap-reserve {
+  flex: 0 0 calc(50% - 33.333333%);
+}
+
+.parallax-prototype-zone-fg {
+  flex: 0 0 33.333333%;
+}
+
+.parallax-prototype-bg-backdrop,
+.parallax-prototype-bg-horizon {
+  position: relative;
+}
+
+.parallax-prototype-fg-stack {
+  position: relative;
+  z-index: 11;
+  justify-content: flex-end;
+}
+
+.parallax-prototype-bg-backdrop .parallax-prototype-band,
+.parallax-prototype-bg-horizon .parallax-prototype-band {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+
+.parallax-prototype-fg-fg1 {
+  flex: 0 0 60%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.parallax-prototype-fg-stack .parallax-prototype-band {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+
+.parallax-prototype-fg-abs {
+  pointer-events: none;
+}
+
+.parallax-prototype-car {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  width: 256px;
+  height: 256px;
+  margin-left: -128px;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+/* Scene stack: see `mobileAssetManifest` z-index map (bg5→bg0, fg1→fg3); overlay stays above at 20. */
+.scene-hud-bg,
+.overlay-hud-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.scene-layer {
+  user-select: none;
+  overflow: hidden;
+}
+
+.scene-layer img {
+  max-width: 100%;
+  max-height: 100%;
+  outline: none;
+}
+
+.scene-fighter {
+  max-width: none;
+  image-rendering: auto;
+  outline: none;
+}
+
+.scene-fighter:focus,
+.scene-fighter:focus-visible {
+  outline: none;
+}
+
+.scene-chart-band {
+  background: #000;
+  overflow: hidden;
+}
+
+/* Android bg3: Compose `Image` default compositing (no BlendMode on flash layers in MainActivity). */
+.scene-bg3-flash,
+.scene-bg3-flash-audience {
+  opacity: 1;
+}
+
+.scene-bg2-meme {
+  opacity: 0.95;
+}
+
+.scene-fg3-cat {
+  pointer-events: none;
+}
+
+.btc-candle-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.splash-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-sequence-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  padding: 1rem 0.75rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  z-index: 20;
+}
+
+.video-overlay-root {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.video-overlay-player-shell {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.video-overlay-player {
+  width: 100%;
+  height: 100%;
+}
+
+.video-overlay-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.video-overlay-close {
+  margin-top: 0.35rem;
+  pointer-events: auto;
+  border: 1px solid rgba(247, 147, 26, 0.85);
+  background: rgba(12, 11, 19, 0.95);
+  color: #f6f0da;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.overlay-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.overlay-column {
+  flex: 1;
+  min-width: 0;
+  max-width: 38%;
+}
+
+.overlay-column-start {
+  text-align: left;
+}
+
+.overlay-column-end {
+  text-align: right;
+}
+
+.overlay-label {
+  margin: 0 0 0.1rem;
+  color: #ffffff;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 1.7578125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.overlay-ticker {
+  white-space: nowrap;
+}
+
+.overlay-label-end {
+  justify-content: flex-end;
+}
+
+.feed-glyph {
+  font-size: 1.21875em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.feed-glyph-svg {
+  display: block;
+  width: 1.095703125em;
+  height: 1.095703125em;
+  flex-shrink: 0;
+}
+
+.overlay-price {
+  margin: 0 0 0.15rem;
+  font-size: 2.5390625rem;
+  font-weight: 600;
+}
+
+.volume-bar-track {
+  width: 100%;
+  max-width: 280px;
+  height: 7px;
+  background: rgba(128, 128, 128, 0.35);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.volume-bar-track-end {
+  margin-left: auto;
+}
+
+.volume-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.28s ease;
+}
+
+.damage-bar-track {
+  height: 12px;
+  margin-top: 0.25rem;
+}
+
+.damage-bar-fill {
+  background: #ffeb3b;
+}
+
+.overlay-mode {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 1.7578125rem;
+  font-weight: 600;
+}
+
+.overlay-mode-offense {
+  color: #4caf50;
+}
+
+.overlay-mode-defense {
+  color: #ffc107;
+}
+
+.overlay-ko-count {
+  margin: 0.1rem 0 0;
+  font-size: 2.197265625rem;
+  font-weight: 700;
+  color: #ffeb3b;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.time-button {
+  pointer-events: auto;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: #f7931a;
+  font-size: unset;
+  min-width: 420px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.time-button:hover {
+  background: transparent;
+  filter: none;
+}
+
+.time-button .overlay-label {
+  font-size: 2.63671875rem;
+}
+
+.time-button .time-block-height {
+  font-size: 4.1015625rem;
+}
+
+.time-button .time-elapsed {
+  font-size: 2.34375rem;
+}
+
+.time-button .time-elapsed.subtle {
+  font-size: 1.904296875rem;
+}
+
+.flash {
+  color: #ffffff;
+}
+
+.subtle {
+  color: #f7931a;
+  font-size: 1.26953125rem;
+}
+
+.time-label {
+  color: #f7931a;
+}
+
+.time-block-height {
+  color: #f7931a;
+  font-size: 2.734375rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.time-elapsed {
+  color: #f7931a;
+  font-size: 1.5625rem;
+}
+
+.repo-links-panel {
+  position: absolute;
+  left: calc(100% + 1rem);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+  width: 205px;
+}
+
+.repo-release-note {
+  margin: 0;
+  padding: 0 0.72rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: rgba(246, 240, 218, 0.72);
+}
+
+.repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.58rem 0.72rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 10px;
+  color: #f6f0da;
+  text-decoration: none;
+  background: rgba(7, 7, 12, 0.66);
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.repo-link:hover {
+  border-color: rgba(247, 147, 26, 0.75);
+  background: rgba(18, 17, 30, 0.92);
+  transform: translateY(-1px);
+}
+
+.repo-link:focus-visible {
+  outline: 2px solid #f7931a;
+  outline-offset: 2px;
+}
+
+.repo-link-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.repo-link-icon-playstore {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.repo-link-playstore {
+  padding: 0.32rem;
+  justify-content: center;
+}
+
+.repo-link-zapstore {
+  padding: 0.32rem;
+  justify-content: center;
+}
+
+.repo-link-lnurl {
+  display: block;
+  padding: 0.32rem;
+  border: 1px solid rgba(247, 147, 26, 0.38);
+  border-radius: 10px;
+  background: rgba(7, 7, 12, 0.66);
+}
+
+.playstore-badge {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.zapstore-badge {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.lnurl-badge {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  border-radius: 8px;
+}
+
+@media (max-width: 1180px) {
+  .app-layout {
+    width: auto;
+  }
+
+  .repo-links-panel {
+    position: static;
+    transform: none;
+    margin-top: 0.9rem;
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
