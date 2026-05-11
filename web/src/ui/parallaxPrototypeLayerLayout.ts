@@ -5,28 +5,11 @@
  */
 
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
-import {
-  FG_ZONE_FRAC,
-  HORIZONTAL_OVERFLOW_PX,
-  ladderStripTopPx,
-  stripHeightPx,
-} from './parallaxPrototypeGeometry'
+import { FG_ZONE_FRAC, stripHeightPx } from './parallaxPrototypeGeometry'
+import { FG1_TOP_SEAM_Y_PX, SHUTTER_LADDER_NEUTRAL_RECTS } from './parallaxShutterLayout'
+import { PARALLAX_LADDER_STRIP_IDS, type ParallaxLadderStripId } from './parallaxLadderIds'
 
-/** Ordered ladder strip ids (indices align with ladder rendering). */
-export const PARALLAX_LADDER_STRIP_IDS = [
-  'bg-5',
-  'bg-4',
-  'bg-3',
-  'bg-2',
-  'bg-1',
-  'fg-6',
-  'fg-5',
-  'fg-4',
-  'fg-3',
-  'fg-2',
-] as const
-
-export type ParallaxLadderStripId = (typeof PARALLAX_LADDER_STRIP_IDS)[number]
+export { PARALLAX_LADDER_STRIP_IDS, type ParallaxLadderStripId } from './parallaxLadderIds'
 
 export type ParallaxPrototypeLayerId =
   | ParallaxLadderStripId
@@ -58,27 +41,19 @@ const CAR_HEIGHT_PX = 256
 /** Matches `.parallax-prototype-car { bottom: 3% }`. */
 const CAR_BOTTOM_FRAC = 0.03
 
-function ladderStripRect(layerIndex: number): ParallaxPrototypeLayerPosition & ParallaxPrototypeLayerSize {
-  return {
-    xPx: -HORIZONTAL_OVERFLOW_PX / 2,
-    yPx: REFERENCE_HEIGHT - ladderStripTopPx(layerIndex),
-    widthPx: REFERENCE_WIDTH + HORIZONTAL_OVERFLOW_PX,
-    heightPx: stripHeightPx,
-  }
-}
-
+/** Ladder strip defaults match neutral shutter rects ([`parallaxShutterLayout`](./parallaxShutterLayout.ts)). */
 function buildLadderPositionDefaults(): Record<ParallaxLadderStripId, ParallaxPrototypeLayerPosition> {
-  const entries = PARALLAX_LADDER_STRIP_IDS.map((id, layerIndex) => {
-    const { xPx, yPx } = ladderStripRect(layerIndex)
-    return [id, { xPx, yPx }] as const
+  const entries = PARALLAX_LADDER_STRIP_IDS.map((id) => {
+    const r = SHUTTER_LADDER_NEUTRAL_RECTS[id]
+    return [id, { xPx: r.xPx, yPx: r.yPx }] as const
   })
   return Object.fromEntries(entries) as Record<ParallaxLadderStripId, ParallaxPrototypeLayerPosition>
 }
 
 function buildLadderSizeDefaults(): Record<ParallaxLadderStripId, ParallaxPrototypeLayerSize> {
-  const entries = PARALLAX_LADDER_STRIP_IDS.map((id, layerIndex) => {
-    const { widthPx, heightPx } = ladderStripRect(layerIndex)
-    return [id, { widthPx, heightPx }] as const
+  const entries = PARALLAX_LADDER_STRIP_IDS.map((id) => {
+    const r = SHUTTER_LADDER_NEUTRAL_RECTS[id]
+    return [id, { widthPx: r.widthPx, heightPx: r.heightPx }] as const
   })
   return Object.fromEntries(entries) as Record<ParallaxLadderStripId, ParallaxPrototypeLayerSize>
 }
@@ -90,7 +65,7 @@ export const PARALLAX_PROTOTYPE_LAYER_POSITION_DEFAULT = {
   'bg-horizon': { xPx: 0, yPx: bg6HeightPx },
   'overlap-reserve': { xPx: 0, yPx: bg6HeightPx + bgHorizonHeightPx },
   'fg-zone': { xPx: 0, yPx: fgZoneTopPx },
-  'fg-1': { xPx: 0, yPx: REFERENCE_HEIGHT - stripHeightPx },
+  'fg-1': { xPx: 0, yPx: FG1_TOP_SEAM_Y_PX },
   car: {
     xPx: REFERENCE_WIDTH / 2 - CAR_WIDTH_PX / 2,
     yPx: REFERENCE_HEIGHT * (1 - CAR_BOTTOM_FRAC) - CAR_HEIGHT_PX,

@@ -58,6 +58,10 @@ Rendering may start as **DOM layers** (divs/images/CSS transforms) inside the fi
 
 The existing boxing scene uses manifest-driven stacking (see comment in `index.css` referencing [`mobileAssetManifest.ts`](../src/ui/mobileAssetManifest.ts)). A driving scene **either** replaces that mode’s stack **or** coexists with clearly separated z-bands; do not mix conventions without documenting the new map.
 
+### Prototype pitch / shutter (current web stub)
+
+In [`ParallaxDrivePrototype`](../src/ui/ParallaxDrivePrototype.tsx), the absolute ladder strips **`bg-5` … `fg-2`** use a signed **`pitch`** in `[-1, 1]` mapped through [`computeShutterLadderRects`](../src/ui/parallaxShutterLayout.ts). The **vertical band** is fixed in reference px between the **BG6 bottom seam** and **FG1 top seam** (same fractions as [`index.css`](../src/index.css) flex column + inner FG1 `60%` slice; see [`parallaxShutterLayout.ts`](../src/ui/parallaxShutterLayout.ts)). **Blues** (`bg-5`–`bg-1`) and **greens** (`fg-6`–`fg-2`) **split that band height**: at `pitch = 0` the split is **50/50** (`NEUTRAL_BLUE_HEIGHT_SHARE`); at `pitch → +1` (downhill) blues take the full band and green strip heights go to **0**; at `pitch → −1` (uphill) the reverse. Strip **positions and heights** come from that model (not per-rung offset ramps). **Drag up** on the stage → downhill (`pitch > 0`); **drag down** → uphill (`pitch < 0`). **Releasing the pointer** eases `pitch` back to **0** (spring). Toggle **`PARALLAX_HORIZON_DRAG_ENABLED`** in the same file to disable the drag layer.
+
 ## Assets
 
 Car, road, and scenery images are **out of band** for this spec: filenames, resolutions, and atlases should be documented when art lands. Stub layers (colors or placeholders) are fine until assets exist.
