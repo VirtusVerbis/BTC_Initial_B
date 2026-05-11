@@ -1,21 +1,20 @@
 import type { CSSProperties } from 'react'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
+import { HORIZONTAL_OVERFLOW_PX } from './parallaxPrototypeGeometry'
+import {
+  getParallaxPrototypeLayerPosition,
+  PARALLAX_LADDER_STRIP_IDS,
+  PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT,
+  type ParallaxLadderStripId,
+} from './parallaxPrototypeLayerLayout'
 
 /**
- * Scenic-drive placeholder stack — BG horizon 50–66%, FG overlaps stacked from bottom with FG6 top at mid-screen.
- * FG bottom spacing: `(midScreen - stripHeight) / 5` so FG1 stays flush bottom (flex) and FG6 top = 50% stage height.
+ * Scenic-drive prototype — unified BG5→FG2 overlap ladder (ascending z-index so tops stay visible).
+ * Top-first geometry: nine equal Δ(top) steps BG5→FG2; visible FG2 rung matches step — FG2 extends under FG1 so FG1 overlaps/occludes lower pixels (thin band like BG4–FG3).
+ * Default x/y per layer: parallaxPrototypeLayerLayout.ts (POSITION_DEFAULT + POSITION_ADJUST).
+ * FG1 stays flex in bottom zone; BG6 backdrop in column. Future: animate hills via yOffsetPxByLayer.
  * Spec: web/docs/stage-parallax-driving.md
  */
-
-const HORIZONTAL_OVERFLOW_PX = 480
-
-/** FG1 height = 60% of bottom third → shared by FG2–FG6 overlap strips */
-const FG_ZONE_FRAC = 1 / 3
-const FG1_FRAC_OF_ZONE = 0.6
-const stripHeightPx = Math.round(FG1_FRAC_OF_ZONE * REFERENCE_HEIGHT * FG_ZONE_FRAC)
-
-/** FG6 top pinned at mid-screen; equal spacing between bottoms FG1→FG6 is `(mid - H) / 5`. */
-const midScreenFromBottomPx = 0.5 * REFERENCE_HEIGHT
 
 const mixRgb = (
   from: readonly [number, number, number],
@@ -39,12 +38,8 @@ const ROAD_LIGHT: [number, number, number] = [52, 211, 103]
 const BG_STEPS = 6
 const FG_STEPS = 6
 
-/** BG6 … BG1 */
-const Z_BG6 = 0
-
-/** FG6 … FG2 absolute overlaps (above BG horizon z-index) */
-const Z_FG6_ABS = 6
-
+/** BG5 furthest (layerIndex 0) … FG2 nearest (layerIndex 9); FG1 flex zone z-index 13. */
+const Z_LADDER_BASE = 2
 const Z_CAR = 15
 
 const bgBlue = (bgIndex1To6: number): string =>
@@ -53,18 +48,26 @@ const bgBlue = (bgIndex1To6: number): string =>
 const fgGreen = (fgIndex1To6: number): string =>
   mixRgb(ROAD_DARK, ROAD_LIGHT, 6 - fgIndex1To6, FG_STEPS)
 
+const ladderStripColor = (id: ParallaxLadderStripId): string => {
+  const [kind, num] = id.split('-') as ['bg' | 'fg', string]
+  const idx = Number(num)
+  return kind === 'bg' ? bgBlue(idx) : fgGreen(idx)
+}
+
+/** Order matches PARALLAX_LADDER_STRIP_IDS / layout defaults. */
+const LADDER_LAYERS: readonly { readonly dataLayer: ParallaxLadderStripId; readonly color: string }[] =
+  PARALLAX_LADDER_STRIP_IDS.map((dataLayer) => ({
+    dataLayer,
+    color: ladderStripColor(dataLayer),
+  }))
+
+/** Hill / bob offsets per ladder strip — hook for animation (indices align with LADDER_LAYERS). */
+const yOffsetPxByLayer: number[] = Array.from({ length: LADDER_LAYERS.length }, () => 0)
+
 const overscanFlexStyle = {
   width: `calc(100% + ${HORIZONTAL_OVERFLOW_PX}px)`,
   marginLeft: `${-HORIZONTAL_OVERFLOW_PX / 2}px`,
 } satisfies CSSProperties
-
-const fgAbsBaseStyle = {
-  position: 'absolute' as const,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  width: `calc(100% + ${HORIZONTAL_OVERFLOW_PX}px)`,
-  boxSizing: 'border-box' as const,
-}
 
 const WideBand = ({
   color,
@@ -83,37 +86,51 @@ const WideBand = ({
   />
 )
 
-/** Bottom edge from stage bottom: FG1 at 0; FG2..FG6 at `(idx)*step` so FG6 top hits mid-screen. */
-const fgBottomStepPx = (midScreenFromBottomPx - stripHeightPx) / 5
-
-const fgOverlapBottomPx = (fgIndex: number): number =>
-  Math.round((fgIndex - 1) * fgBottomStepPx)
-
 export const ParallaxDrivePrototype = () => {
   const rootStyle = {
     ['--stage-w' as string]: `${REFERENCE_WIDTH}px`,
     ['--stage-h' as string]: `${REFERENCE_HEIGHT}px`,
   } as CSSProperties
 
+  const carPos = getParallaxPrototypeLayerPosition('car')
+  const carSize = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT.car
+
   return (
     <div className="parallax-prototype-root scene-placeholder" style={rootStyle}>
+      {/* Before column: opaque BG6 masks ladder intrusion into sky */}
+      {LADDER_LAYERS.map((layer, layerIndex) => {
+        const pos = getParallaxPrototypeLayerPosition(layer.dataLayer)
+        const size = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT[layer.dataLayer]
+        const yTopPx = pos.yPx - yOffsetPxByLayer[layerIndex]!
+        const bottomPx = REFERENCE_HEIGHT - yTopPx - size.heightPx
+        return (
+          <div
+            key={layer.dataLayer}
+            className="parallax-prototype-ladder-strip parallax-prototype-band"
+            style={{
+              position: 'absolute',
+              left: `${pos.xPx}px`,
+              bottom: `${bottomPx}px`,
+              width: `${size.widthPx}px`,
+              height: `${size.heightPx}px`,
+              transform: 'none',
+              boxSizing: 'border-box',
+              backgroundColor: layer.color,
+              zIndex: Z_LADDER_BASE + layerIndex,
+            }}
+            data-layer={layer.dataLayer}
+            aria-hidden
+          />
+        )
+      })}
+
       <div className="parallax-prototype-column">
         <div className="parallax-prototype-zone-bg6 parallax-prototype-bg-backdrop">
-          <WideBand color={bgBlue(6)} zIndex={Z_BG6} dataLayer="bg-6" />
+          <WideBand color={bgBlue(6)} zIndex={0} dataLayer="bg-6" />
         </div>
 
-        <div className="parallax-prototype-zone-bg-horizon parallax-prototype-bg-horizon">
-          {[5, 4, 3, 2, 1].map((n) => (
-            <WideBand
-              key={`bg-${n}`}
-              color={bgBlue(n)}
-              zIndex={Z_BG6 + (6 - n)}
-              dataLayer={`bg-${n}`}
-            />
-          ))}
-        </div>
+        <div className="parallax-prototype-zone-bg-horizon parallax-prototype-bg-horizon" aria-hidden />
 
-        {/* In-flow spacer for 33–50% from bottom (absolute FG2–FG6 paint here); keeps column height sum = 100% */}
         <div className="parallax-prototype-zone-overlap-reserve" aria-hidden />
 
         <div className="parallax-prototype-zone-fg parallax-prototype-fg-stack">
@@ -123,23 +140,19 @@ export const ParallaxDrivePrototype = () => {
         </div>
       </div>
 
-      {[6, 5, 4, 3, 2].map((n) => (
-        <div
-          key={`fg-abs-${n}`}
-          className="parallax-prototype-fg-abs parallax-prototype-band"
-          style={{
-            ...fgAbsBaseStyle,
-            backgroundColor: fgGreen(n),
-            zIndex: Z_FG6_ABS + (6 - n),
-            bottom: `${fgOverlapBottomPx(n)}px`,
-            height: `${stripHeightPx}px`,
-          }}
-          data-layer={`fg-${n}`}
-          aria-hidden
-        />
-      ))}
-
-      <div className="parallax-prototype-car" style={{ zIndex: Z_CAR }} aria-label="Prototype car placeholder" />
+      <div
+        className="parallax-prototype-car"
+        style={{
+          zIndex: Z_CAR,
+          left: `${carPos.xPx}px`,
+          top: `${carPos.yPx}px`,
+          bottom: 'auto',
+          width: `${carSize.widthPx}px`,
+          height: `${carSize.heightPx}px`,
+          marginLeft: 0,
+        }}
+        aria-label="Prototype car placeholder"
+      />
     </div>
   )
 }

@@ -125,15 +125,18 @@ body {
 
 .parallax-prototype-fg-stack {
   position: relative;
-  z-index: 11;
+  z-index: 13;
   justify-content: flex-end;
 }
 
-.parallax-prototype-bg-backdrop .parallax-prototype-band,
-.parallax-prototype-bg-horizon .parallax-prototype-band {
+.parallax-prototype-bg-backdrop .parallax-prototype-band {
   flex: 1 1 0;
   min-height: 0;
   position: relative;
+}
+
+.parallax-prototype-ladder-strip {
+  pointer-events: none;
 }
 
 .parallax-prototype-fg-fg1 {
@@ -148,10 +151,6 @@ body {
   flex: 1 1 0;
   min-height: 0;
   position: relative;
-}
-
-.parallax-prototype-fg-abs {
-  pointer-events: none;
 }
 
 .parallax-prototype-car {
@@ -250,6 +249,21 @@ body {
   flex-direction: column;
   justify-content: flex-start;
   z-index: 20;
+  --overlay-text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000,
+    0 0 1px #000;
+}
+
+.overlay .overlay-label,
+.overlay .overlay-price,
+.overlay .overlay-mode,
+.overlay .overlay-ko-count,
+.overlay .time-block-height,
+.overlay .time-elapsed {
+  text-shadow: var(--overlay-text-shadow);
 }
 
 .video-overlay-root {
