@@ -8,6 +8,7 @@ import {
   PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT,
   type ParallaxLadderStripId,
 } from './parallaxPrototypeLayerLayout'
+import { resolveMobileAssetUrl } from './mobileAssetUrls'
 import { computeShutterLadderRects } from './parallaxShutterLayout'
 
 /**
@@ -17,6 +18,7 @@ import { computeShutterLadderRects } from './parallaxShutterLayout'
  * **Pitch / shutter**: ladder strips use `computeShutterLadderRects(pitch)` (constant seam band, blues vs greens share height).
  * Drag **up** → uphill (`pitch < 0`); drag **down** → downhill (`pitch > 0`). **Pointer release** eases `pitch` back to 0 (spring).
  * Drag **left** → positive `lateral`; drag **right** → negative `lateral` → BG1–BG6 `translateX` (differential parallax). Release eases `lateral` to 0 with the same spring as pitch.
+ * **FG road art**: ladder `fg-2`…`fg-6` and wide `fg-1` show two stretched layers (`road_NNN.png` / `road_NNNa.png`); `opacity` toggles every `FG_ROAD_IMAGE_SET_ALTERNATION_MS` so both bitmaps stay mounted.
  * Spec: web/docs/stage-parallax-driving.md
  */
 
@@ -46,6 +48,9 @@ const FG_STEPS = 6
 const Z_LADDER_BASE = 2
 const Z_CAR = 15
 
+/** Interval between swapping FG road PNG sets (`road_XXX.png` vs `road_XXXa.png`) for motion illusion. */
+const FG_ROAD_IMAGE_SET_ALTERNATION_MS = 100
+
 const bgBlue = (bgIndex1To6: number): string =>
   mixRgb(BG_LIGHT, BG_DARK, 6 - bgIndex1To6, BG_STEPS)
 
@@ -64,6 +69,64 @@ const LADDER_LAYERS: readonly { readonly dataLayer: ParallaxLadderStripId; reado
     dataLayer,
     color: ladderStripColor(dataLayer),
   }))
+
+/** Set 1: `road_NNN.png`; set 2: `road_NNNa.png`. `fgStripIndex` is 1…6 (FG-1 … FG-6 filenames). */
+function resolveFgRoadStripUrl(fgStripIndex1To6: number, useAlternateSet: boolean): string {
+  const n = String(fgStripIndex1To6).padStart(3, '0')
+  const file = useAlternateSet ? `road_${n}a.png` : `road_${n}.png`
+  return resolveMobileAssetUrl(file)
+}
+
+const stretchedBackgroundFromUrl = (imageSrc: string): Pick<
+  CSSProperties,
+  'backgroundImage' | 'backgroundSize' | 'backgroundRepeat' | 'backgroundPosition'
+> => ({
+  backgroundImage: `url(${imageSrc})`,
+  backgroundSize: '100% 100%',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center',
+})
+
+type FgRoadUrlPair = { set1: string; set2: string }
+
+/** All FG road strip URLs (set 1 + set 2) for decode preload on mount. */
+const FG_ROAD_PRELOAD_URLS = ([1, 2, 3, 4, 5, 6] as const).flatMap((i) => [
+  resolveFgRoadStripUrl(i, false),
+  resolveFgRoadStripUrl(i, true),
+])
+
+const FgRoadDualStretch = ({
+  urlSet1,
+  urlSet2,
+  showSet2,
+}: {
+  urlSet1: string
+  urlSet2: string
+  showSet2: boolean
+}) => (
+  <>
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        inset: 0,
+        opacity: showSet2 ? 0 : 1,
+        pointerEvents: 'none',
+        ...stretchedBackgroundFromUrl(urlSet1),
+      }}
+    />
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        inset: 0,
+        opacity: showSet2 ? 1 : 0,
+        pointerEvents: 'none',
+        ...stretchedBackgroundFromUrl(urlSet2),
+      }}
+    />
+  </>
+)
 
 /** 2× stage column width; margin centers strip on parent (see PARALLAX_STRIP_* ref px). */
 const overscanFlexStyle = {
@@ -95,28 +158,50 @@ const WideBand = ({
   dataLayer,
   translateXPx = 0,
   showCenterGuide = false,
+  imageSrc,
+  roadImagePair,
+  roadShowSet2,
 }: {
   color: string
   zIndex: number
   dataLayer: string
   translateXPx?: number
   showCenterGuide?: boolean
-}) => (
-  <div
-    className="parallax-prototype-band"
-    style={{
-      ...overscanFlexStyle,
-      backgroundColor: color,
-      zIndex,
-      position: 'relative',
-      transform: translateXPx !== 0 ? `translateX(${translateXPx}px)` : 'none',
-    }}
-    data-layer={dataLayer}
-    aria-hidden
-  >
-    {showCenterGuide ? <ParallaxBgCenterGuide /> : null}
-  </div>
-)
+  /** When set, image is stretched to fill the band (`background-size: 100% 100%`). Mutually exclusive with `roadImagePair`. */
+  imageSrc?: string
+  /** Two stretched layers; toggle `roadShowSet2` for motion without swapping `background-image`. */
+  roadImagePair?: FgRoadUrlPair
+  roadShowSet2?: boolean
+}) => {
+  const hasRoadDual = roadImagePair != null
+  const hasImage = Boolean(imageSrc) || hasRoadDual
+  return (
+    <div
+      className="parallax-prototype-band"
+      style={{
+        ...overscanFlexStyle,
+        ...(hasImage ? {} : { backgroundColor: color }),
+        ...(imageSrc && !hasRoadDual ? stretchedBackgroundFromUrl(imageSrc) : {}),
+        zIndex,
+        position: 'relative',
+        transform: translateXPx !== 0 ? `translateX(${translateXPx}px)` : 'none',
+      }}
+      data-layer={dataLayer}
+      aria-hidden
+    >
+      {hasRoadDual ? (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+          <FgRoadDualStretch
+            urlSet1={roadImagePair.set1}
+            urlSet2={roadImagePair.set2}
+            showSet2={Boolean(roadShowSet2)}
+          />
+        </div>
+      ) : null}
+      {showCenterGuide ? <ParallaxBgCenterGuide /> : null}
+    </div>
+  )
+}
 
 const isBgLadderStrip = (id: ParallaxLadderStripId): id is 'bg-5' | 'bg-4' | 'bg-3' | 'bg-2' | 'bg-1' =>
   id.startsWith('bg-')
@@ -186,6 +271,40 @@ export const ParallaxDrivePrototype = () => {
   useEffect(() => () => cancelSpring(), [cancelSpring])
 
   const shutterRectsById = useMemo(() => computeShutterLadderRects(pitch), [pitch])
+
+  const [useAlternateFgRoadSet, setUseAlternateFgRoadSet] = useState(false)
+
+  useEffect(() => {
+    for (const src of FG_ROAD_PRELOAD_URLS) {
+      const img = new Image()
+      img.src = src
+    }
+  }, [])
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setUseAlternateFgRoadSet((v) => !v)
+    }, FG_ROAD_IMAGE_SET_ALTERNATION_MS)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const fg1RoadUrlPair = useMemo(
+    (): FgRoadUrlPair => ({
+      set1: resolveFgRoadStripUrl(1, false),
+      set2: resolveFgRoadStripUrl(1, true),
+    }),
+    [],
+  )
+
+  const fgLadderRoadUrlPairs = useMemo((): Partial<Record<ParallaxLadderStripId, FgRoadUrlPair>> => {
+    return {
+      'fg-2': { set1: resolveFgRoadStripUrl(2, false), set2: resolveFgRoadStripUrl(2, true) },
+      'fg-3': { set1: resolveFgRoadStripUrl(3, false), set2: resolveFgRoadStripUrl(3, true) },
+      'fg-4': { set1: resolveFgRoadStripUrl(4, false), set2: resolveFgRoadStripUrl(4, true) },
+      'fg-5': { set1: resolveFgRoadStripUrl(5, false), set2: resolveFgRoadStripUrl(5, true) },
+      'fg-6': { set1: resolveFgRoadStripUrl(6, false), set2: resolveFgRoadStripUrl(6, true) },
+    }
+  }, [])
 
   const dragSessionRef = useRef<{
     pointerId: number
@@ -276,6 +395,7 @@ export const ParallaxDrivePrototype = () => {
         const bottomPx = REFERENCE_HEIGHT - r.yPx - r.heightPx
         const bgLateral = isBgLadderStrip(layer.dataLayer)
         const txPx = bgLateral ? lateralTranslateRefPx(lateral, layer.dataLayer) : 0
+        const roadPair = fgLadderRoadUrlPairs[layer.dataLayer]
         return (
           <div
             key={layer.dataLayer}
@@ -288,12 +408,21 @@ export const ParallaxDrivePrototype = () => {
               height: `${r.heightPx}px`,
               transform: txPx !== 0 ? `translateX(${txPx}px)` : 'none',
               boxSizing: 'border-box',
-              backgroundColor: layer.color,
+              ...(roadPair ? {} : { backgroundColor: layer.color }),
               zIndex: Z_LADDER_BASE + layerIndex,
             }}
             data-layer={layer.dataLayer}
             aria-hidden
           >
+            {roadPair ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                <FgRoadDualStretch
+                  urlSet1={roadPair.set1}
+                  urlSet2={roadPair.set2}
+                  showSet2={useAlternateFgRoadSet}
+                />
+              </div>
+            ) : null}
             {bgLateral ? <ParallaxBgCenterGuide /> : null}
           </div>
         )
@@ -316,7 +445,13 @@ export const ParallaxDrivePrototype = () => {
 
         <div className="parallax-prototype-zone-fg parallax-prototype-fg-stack">
           <div className="parallax-prototype-fg-fg1">
-            <WideBand color={fgGreen(1)} zIndex={0} dataLayer="fg-1" />
+            <WideBand
+              color={fgGreen(1)}
+              zIndex={0}
+              dataLayer="fg-1"
+              roadImagePair={fg1RoadUrlPair}
+              roadShowSet2={useAlternateFgRoadSet}
+            />
           </div>
         </div>
       </div>
