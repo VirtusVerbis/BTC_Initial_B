@@ -6,7 +6,7 @@
 
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import { FG_ZONE_FRAC, stripHeightPx } from './parallaxPrototypeGeometry'
-import { FG1_TOP_SEAM_Y_PX, SHUTTER_LADDER_NEUTRAL_RECTS } from './parallaxShutterLayout'
+import { FG1_TOP_SEAM_SNAPPED_Y_PX, SHUTTER_LADDER_NEUTRAL_RECTS } from './parallaxShutterLayout'
 import { PARALLAX_LADDER_STRIP_IDS, type ParallaxLadderStripId } from './parallaxLadderIds'
 
 export { PARALLAX_LADDER_STRIP_IDS, type ParallaxLadderStripId } from './parallaxLadderIds'
@@ -65,7 +65,7 @@ export const PARALLAX_PROTOTYPE_LAYER_POSITION_DEFAULT = {
   'bg-horizon': { xPx: 0, yPx: bg6HeightPx },
   'overlap-reserve': { xPx: 0, yPx: bg6HeightPx + bgHorizonHeightPx },
   'fg-zone': { xPx: 0, yPx: fgZoneTopPx },
-  'fg-1': { xPx: 0, yPx: FG1_TOP_SEAM_Y_PX },
+  'fg-1': { xPx: 0, yPx: FG1_TOP_SEAM_SNAPPED_Y_PX },
   car: {
     xPx: REFERENCE_WIDTH / 2 - CAR_WIDTH_PX / 2,
     yPx: REFERENCE_HEIGHT * (1 - CAR_BOTTOM_FRAC) - CAR_HEIGHT_PX,

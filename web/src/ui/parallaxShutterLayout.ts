@@ -31,6 +31,9 @@ const fgZoneHeightPx = REFERENCE_HEIGHT * FG_ZONE_FRAC
 /** Upper edge of FG1 flex band (top of shutter band bottom seam). */
 export const FG1_TOP_SEAM_Y_PX = fgZoneTopYpx + fgZoneHeightPx * (1 - FG1_BAND_FRAC_OF_FG_ZONE)
 
+/** Integer ref Y for FG1 band top; matches ladder snap `yEnd` and `fg-2` bottom. */
+export const FG1_TOP_SEAM_SNAPPED_Y_PX = Math.round(FG1_TOP_SEAM_Y_PX)
+
 /** Vertical span in which ladder strips are laid (reference px). */
 export const SHUTTER_BAND_HEIGHT_PX = FG1_TOP_SEAM_Y_PX - BG6_BOTTOM_SEAM_Y_PX
 
@@ -53,6 +56,43 @@ const GREEN_STRIP_X_PX = 0
 
 const BLUE_IDS: readonly ParallaxLadderStripId[] = ['bg-5', 'bg-4', 'bg-3', 'bg-2', 'bg-1']
 const GREEN_IDS: readonly ParallaxLadderStripId[] = ['fg-6', 'fg-5', 'fg-4', 'fg-3', 'fg-2']
+
+/** Top-to-bottom order for cumulative vertical snapping (must match ladder draw order). */
+const SHUTTER_LADDER_STRIP_ORDER: readonly ParallaxLadderStripId[] = [...BLUE_IDS, ...GREEN_IDS]
+
+/**
+ * Snap strip `yPx` / `heightPx` to integers so adjacent strips share exact edges in CSS px space
+ * (avoids subpixel hairlines). Invariant: first `yPx === round(BG6 bottom)`; last bottom `=== round(FG1 top)`;
+ * each strip's bottom equals the next strip's top.
+ */
+function snapShutterLadderRectsVertical(
+  raw: Record<ParallaxLadderStripId, ShutterLadderRect>,
+): Record<ParallaxLadderStripId, ShutterLadderRect> {
+  const yStart = Math.round(BG6_BOTTOM_SEAM_Y_PX)
+  const yEnd = FG1_TOP_SEAM_SNAPPED_Y_PX
+  const snapped = { ...raw }
+  let yCursor = yStart
+  let acc = BG6_BOTTOM_SEAM_Y_PX
+
+  for (let i = 0; i < SHUTTER_LADDER_STRIP_ORDER.length - 1; i++) {
+    const id = SHUTTER_LADDER_STRIP_ORDER[i]!
+    const r = raw[id]!
+    acc += r.heightPx
+    const nextY = Math.round(acc)
+    const heightPx = Math.max(0, nextY - yCursor)
+    snapped[id] = { ...r, yPx: yCursor, heightPx }
+    yCursor = nextY
+  }
+
+  const lastId = SHUTTER_LADDER_STRIP_ORDER[SHUTTER_LADDER_STRIP_ORDER.length - 1]!
+  const lastRaw = raw[lastId]!
+  snapped[lastId] = {
+    ...lastRaw,
+    yPx: yCursor,
+    heightPx: Math.max(0, yEnd - yCursor),
+  }
+  return snapped
+}
 
 function smoothstep01(t: number): number {
   const x = Math.max(0, Math.min(1, t))
@@ -80,7 +120,7 @@ export function buildShutterLadderRectsAtBlueShare(blueHeightShare: number): Rec
     out[id] = { xPx: GREEN_STRIP_X_PX, yPx: y, widthPx: GREEN_STRIP_WIDTH_PX, heightPx: greenH }
     y += greenH
   }
-  return out
+  return snapShutterLadderRectsVertical(out)
 }
 
 /** Neutral layout (`pitch === 0`), same as `computeShutterLadderRects(0)`. */

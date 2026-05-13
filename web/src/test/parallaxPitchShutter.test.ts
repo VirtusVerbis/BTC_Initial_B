@@ -6,10 +6,13 @@ import {
   BG6_BOTTOM_SEAM_Y_PX,
   buildShutterLadderRectsAtBlueShare,
   computeShutterLadderRects,
-  FG1_TOP_SEAM_Y_PX,
-  SHUTTER_BAND_HEIGHT_PX,
+  FG1_TOP_SEAM_SNAPPED_Y_PX,
   SHUTTER_LADDER_NEUTRAL_RECTS,
 } from '../ui/parallaxShutterLayout'
+
+/** Integer reference height of the shutter band after vertical snapping (matches ladder sum). */
+const SHUTTER_BAND_SNAPPED_HEIGHT_PX =
+  FG1_TOP_SEAM_SNAPPED_Y_PX - Math.round(BG6_BOTTOM_SEAM_Y_PX)
 
 describe('parallaxShutterLayout', () => {
   it('computeShutterLadderRects(0) matches neutral table', () => {
@@ -24,30 +27,34 @@ describe('parallaxShutterLayout', () => {
     }
   })
 
-  it('total ladder strip heights equal shutter band at any pitch', () => {
+  it('total ladder strip heights equal snapped shutter band at any pitch', () => {
     for (const p of [-1, -0.3, 0, 0.3, 1]) {
       const m = computeShutterLadderRects(p)
       let sum = 0
       for (const id of PARALLAX_LADDER_STRIP_IDS) {
         sum += m[id]!.heightPx
         expect(m[id]!.heightPx).toBeGreaterThanOrEqual(0)
+        expect(Number.isInteger(m[id]!.heightPx)).toBe(true)
+        expect(Number.isInteger(m[id]!.yPx)).toBe(true)
       }
-      expect(sum).toBeCloseTo(SHUTTER_BAND_HEIGHT_PX, 6)
+      expect(sum).toBe(SHUTTER_BAND_SNAPPED_HEIGHT_PX)
+      const fg2 = m['fg-2']!
+      expect(fg2.yPx + fg2.heightPx).toBe(FG1_TOP_SEAM_SNAPPED_Y_PX)
     }
   })
 
-  it('full downhill: BG1 stack fills to FG1 top seam', () => {
+  it('full downhill: BG1 stack fills to snapped FG1 top seam', () => {
     const m = computeShutterLadderRects(1)
     const bg1 = m['bg-1']!
-    expect(bg1.yPx + bg1.heightPx).toBeCloseTo(FG1_TOP_SEAM_Y_PX, 5)
-    expect(m['fg-2']!.heightPx).toBeLessThanOrEqual(1e-6)
+    expect(bg1.yPx + bg1.heightPx).toBe(FG1_TOP_SEAM_SNAPPED_Y_PX)
+    expect(m['fg-2']!.heightPx).toBe(0)
   })
 
-  it('full uphill: FG6 starts at BG6 bottom seam', () => {
+  it('full uphill: FG6 starts at snapped BG6 bottom seam', () => {
     const m = computeShutterLadderRects(-1)
     const fg6 = m['fg-6']!
-    expect(fg6.yPx).toBeCloseTo(BG6_BOTTOM_SEAM_Y_PX, 5)
-    expect(m['bg-5']!.heightPx).toBeLessThanOrEqual(1e-6)
+    expect(fg6.yPx).toBe(Math.round(BG6_BOTTOM_SEAM_Y_PX))
+    expect(m['bg-5']!.heightPx).toBe(0)
   })
 
   it('buildShutterLadderRectsAtBlueShare(0.5) matches neutral blue share', () => {

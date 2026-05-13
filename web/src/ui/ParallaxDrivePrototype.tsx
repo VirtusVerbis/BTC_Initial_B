@@ -18,7 +18,7 @@ import { computeShutterLadderRects } from './parallaxShutterLayout'
  * **Pitch / shutter**: ladder strips use `computeShutterLadderRects(pitch)` (constant seam band, blues vs greens share height).
  * Drag **up** → uphill (`pitch < 0`); drag **down** → downhill (`pitch > 0`). **Pointer release** eases `pitch` back to 0 (spring).
  * Drag **left** → positive `lateral`; drag **right** → negative `lateral` → BG1–BG6 `translateX` (differential parallax). Release eases `lateral` to 0 with the same spring as pitch.
- * **FG road art**: all FG layers `fg-1`…`fg-6` are absolutely positioned and show two stretched layers (`road_NNN.png` / `road_NNNa.png`); `opacity` toggles every `FG_ROAD_IMAGE_SET_ALTERNATION_MS` so both bitmaps stay mounted.
+ * **FG road art**: all FG layers `fg-1`…`fg-6` show vertical slices of two full atlases (`road_straight_a_full.png` / `road_straight_b_full.png`); `opacity` toggles every `FG_ROAD_STRAIGHT_ALTERNATION_MS` so both bitmaps stay mounted and decoded.
  * Spec: web/docs/stage-parallax-driving.md
  */
 
@@ -49,8 +49,67 @@ const Z_LADDER_BASE = 2
 const Z_FG1 = 13
 const Z_CAR = 15
 
-/** Interval between swapping FG road PNG sets (`road_XXX.png` vs `road_XXXa.png`) for motion illusion. */
-const FG_ROAD_IMAGE_SET_ALTERNATION_MS = 100
+/** Interval between swapping FG road atlases (`road_straight_a` vs `road_straight_b`) for motion illusion. */
+const FG_ROAD_STRAIGHT_ALTERNATION_MS = 100
+
+/** Extra ref px height on nearer FG strips (grow upward, same bottom) to hide CSS background seams. */
+const FG_ROAD_STRIP_OVERLAP_PX = 2
+
+/** Full-bleed straight road PNG pixel size (see `public/mobile/road_straight_*_full.png`). */
+const ROAD_STRAIGHT_ATLAS_HEIGHT_PX = 1268
+
+const ROAD_STRAIGHT_A_URL = resolveMobileAssetUrl('road_straight_a_full.png')
+const ROAD_STRAIGHT_B_URL = resolveMobileAssetUrl('road_straight_b_full.png')
+
+/**
+ * Source slice (top-left origin) for each FG strip index: 1 = fg-1 (nearest) … 6 = fg-6 (farthest).
+ * Each slice spans the full atlas width (1080px). Heights sum to {@link ROAD_STRAIGHT_ATLAS_HEIGHT_PX}.
+ */
+const FG_STRAIGHT_ATLAS_SLICE_BY_STRIP_INDEX: Record<
+  1 | 2 | 3 | 4 | 5 | 6,
+  { readonly srcY: number; readonly srcH: number }
+> = {
+  1: { srcY: 885, srcH: 383 },
+  2: { srcY: 708, srcH: 177 },
+  3: { srcY: 531, srcH: 177 },
+  4: { srcY: 354, srcH: 177 },
+  5: { srcY: 177, srcH: 177 },
+  6: { srcY: 0, srcH: 177 },
+}
+
+function fgStripIndexFromLadderId(id: ParallaxLadderStripId): 1 | 2 | 3 | 4 | 5 | 6 | null {
+  if (!id.startsWith('fg-')) return null
+  const n = Number(id.slice(3))
+  if (n < 1 || n > 6 || !Number.isInteger(n)) return null
+  return n as 1 | 2 | 3 | 4 | 5 | 6
+}
+
+function roadStraightAtlasBackgroundStyles(
+  imageSrc: string,
+  slice: { srcY: number; srcH: number },
+  layoutWidthPx: number,
+  layoutHeightPx: number,
+): Pick<
+  CSSProperties,
+  'backgroundImage' | 'backgroundSize' | 'backgroundRepeat' | 'backgroundPosition'
+> {
+  const { srcY, srcH } = slice
+  if (srcH <= 0 || layoutHeightPx <= 0) {
+    return {
+      backgroundImage: `url(${imageSrc})`,
+      backgroundSize: '100% 100%',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+    }
+  }
+  const bgH = (ROAD_STRAIGHT_ATLAS_HEIGHT_PX * layoutHeightPx) / srcH
+  return {
+    backgroundImage: `url(${imageSrc})`,
+    backgroundSize: `${layoutWidthPx}px ${bgH}px`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: `center ${-(srcY * layoutHeightPx) / srcH}px`,
+  }
+}
 
 const bgBlue = (bgIndex1To6: number): string =>
   mixRgb(BG_LIGHT, BG_DARK, 6 - bgIndex1To6, BG_STEPS)
@@ -71,63 +130,51 @@ const LADDER_LAYERS: readonly { readonly dataLayer: ParallaxLadderStripId; reado
     color: ladderStripColor(dataLayer),
   }))
 
-/** Set 1: `road_NNN.png`; set 2: `road_NNNa.png`. `fgStripIndex` is 1…6 (FG-1 … FG-6 filenames). */
-function resolveFgRoadStripUrl(fgStripIndex1To6: number, useAlternateSet: boolean): string {
-  const n = String(fgStripIndex1To6).padStart(3, '0')
-  const file = useAlternateSet ? `road_${n}a.png` : `road_${n}.png`
-  return resolveMobileAssetUrl(file)
-}
+/** Both atlas URLs for decode preload on mount. */
+const FG_ROAD_PRELOAD_URLS: readonly string[] = [ROAD_STRAIGHT_A_URL, ROAD_STRAIGHT_B_URL]
 
-const stretchedBackgroundFromUrl = (imageSrc: string): Pick<
-  CSSProperties,
-  'backgroundImage' | 'backgroundSize' | 'backgroundRepeat' | 'backgroundPosition'
-> => ({
-  backgroundImage: `url(${imageSrc})`,
-  backgroundSize: '100% 100%',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center',
-})
-
-type FgRoadUrlPair = { set1: string; set2: string }
-
-/** All FG road strip URLs (set 1 + set 2) for decode preload on mount. */
-const FG_ROAD_PRELOAD_URLS = ([1, 2, 3, 4, 5, 6] as const).flatMap((i) => [
-  resolveFgRoadStripUrl(i, false),
-  resolveFgRoadStripUrl(i, true),
-])
-
-const FgRoadDualStretch = ({
-  urlSet1,
-  urlSet2,
-  showSet2,
+const FgRoadStraightAtlasDual = ({
+  urlStraightA,
+  urlStraightB,
+  showStraightB,
+  slice,
+  layoutWidthPx,
+  layoutHeightPx,
 }: {
-  urlSet1: string
-  urlSet2: string
-  showSet2: boolean
-}) => (
-  <>
-    <div
-      aria-hidden
-      style={{
-        position: 'absolute',
-        inset: 0,
-        opacity: showSet2 ? 0 : 1,
-        pointerEvents: 'none',
-        ...stretchedBackgroundFromUrl(urlSet1),
-      }}
-    />
-    <div
-      aria-hidden
-      style={{
-        position: 'absolute',
-        inset: 0,
-        opacity: showSet2 ? 1 : 0,
-        pointerEvents: 'none',
-        ...stretchedBackgroundFromUrl(urlSet2),
-      }}
-    />
-  </>
-)
+  urlStraightA: string
+  urlStraightB: string
+  showStraightB: boolean
+  slice: { srcY: number; srcH: number }
+  layoutWidthPx: number
+  layoutHeightPx: number
+}) => {
+  const a = roadStraightAtlasBackgroundStyles(urlStraightA, slice, layoutWidthPx, layoutHeightPx)
+  const b = roadStraightAtlasBackgroundStyles(urlStraightB, slice, layoutWidthPx, layoutHeightPx)
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: showStraightB ? 0 : 1,
+          pointerEvents: 'none',
+          ...a,
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: showStraightB ? 1 : 0,
+          pointerEvents: 'none',
+          ...b,
+        }}
+      />
+    </>
+  )
+}
 
 /** 2× stage column width; margin centers strip on parent (see PARALLAX_STRIP_* ref px). */
 const overscanFlexStyle = {
@@ -251,7 +298,7 @@ export const ParallaxDrivePrototype = () => {
 
   const shutterRectsById = useMemo(() => computeShutterLadderRects(pitch), [pitch])
 
-  const [useAlternateFgRoadSet, setUseAlternateFgRoadSet] = useState(false)
+  const [showStraightBRoad, setShowStraightBRoad] = useState(false)
 
   useEffect(() => {
     for (const src of FG_ROAD_PRELOAD_URLS) {
@@ -262,27 +309,9 @@ export const ParallaxDrivePrototype = () => {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setUseAlternateFgRoadSet((v) => !v)
-    }, FG_ROAD_IMAGE_SET_ALTERNATION_MS)
+      setShowStraightBRoad((v) => !v)
+    }, FG_ROAD_STRAIGHT_ALTERNATION_MS)
     return () => window.clearInterval(id)
-  }, [])
-
-  const fg1RoadUrlPair = useMemo(
-    (): FgRoadUrlPair => ({
-      set1: resolveFgRoadStripUrl(1, false),
-      set2: resolveFgRoadStripUrl(1, true),
-    }),
-    [],
-  )
-
-  const fgLadderRoadUrlPairs = useMemo((): Partial<Record<ParallaxLadderStripId, FgRoadUrlPair>> => {
-    return {
-      'fg-2': { set1: resolveFgRoadStripUrl(2, false), set2: resolveFgRoadStripUrl(2, true) },
-      'fg-3': { set1: resolveFgRoadStripUrl(3, false), set2: resolveFgRoadStripUrl(3, true) },
-      'fg-4': { set1: resolveFgRoadStripUrl(4, false), set2: resolveFgRoadStripUrl(4, true) },
-      'fg-5': { set1: resolveFgRoadStripUrl(5, false), set2: resolveFgRoadStripUrl(5, true) },
-      'fg-6': { set1: resolveFgRoadStripUrl(6, false), set2: resolveFgRoadStripUrl(6, true) },
-    }
   }, [])
 
   const dragSessionRef = useRef<{
@@ -349,6 +378,8 @@ export const ParallaxDrivePrototype = () => {
   const carSize = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT.car
   const fg1Pos = getParallaxPrototypeLayerPosition('fg-1')
   const fg1Size = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT['fg-1']
+  const fg1OverlapPx = fg1Size.heightPx > 0 ? FG_ROAD_STRIP_OVERLAP_PX : 0
+  const fg1DisplayHeightPx = fg1Size.heightPx + fg1OverlapPx
 
   return (
     <div className="parallax-prototype-root scene-placeholder" style={rootStyle}>
@@ -376,7 +407,14 @@ export const ParallaxDrivePrototype = () => {
         const bottomPx = REFERENCE_HEIGHT - r.yPx - r.heightPx
         const bgLateral = isBgLadderStrip(layer.dataLayer)
         const txPx = bgLateral ? lateralTranslateRefPx(lateral, layer.dataLayer) : 0
-        const roadPair = fgLadderRoadUrlPairs[layer.dataLayer]
+        const fgStripIdx = fgStripIndexFromLadderId(layer.dataLayer)
+        const fgAtlasSlice =
+          fgStripIdx !== null && fgStripIdx >= 2 ? FG_STRAIGHT_ATLAS_SLICE_BY_STRIP_INDEX[fgStripIdx] : null
+        const fgRoadOverlapPx =
+          fgStripIdx != null && fgStripIdx >= 2 && fgStripIdx <= 5 && r.heightPx > 0
+            ? FG_ROAD_STRIP_OVERLAP_PX
+            : 0
+        const fgRoadDisplayHeightPx = r.heightPx + fgRoadOverlapPx
         return (
           <div
             key={layer.dataLayer}
@@ -386,21 +424,24 @@ export const ParallaxDrivePrototype = () => {
               left: `${r.xPx}px`,
               bottom: `${bottomPx}px`,
               width: `${r.widthPx}px`,
-              height: `${r.heightPx}px`,
+              height: `${fgAtlasSlice ? fgRoadDisplayHeightPx : r.heightPx}px`,
               transform: txPx !== 0 ? `translateX(${txPx}px)` : 'none',
               boxSizing: 'border-box',
-              ...(roadPair ? {} : { backgroundColor: layer.color }),
+              ...(fgAtlasSlice ? {} : { backgroundColor: layer.color }),
               zIndex: Z_LADDER_BASE + layerIndex,
             }}
             data-layer={layer.dataLayer}
             aria-hidden
           >
-            {roadPair ? (
+            {fgAtlasSlice ? (
               <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                <FgRoadDualStretch
-                  urlSet1={roadPair.set1}
-                  urlSet2={roadPair.set2}
-                  showSet2={useAlternateFgRoadSet}
+                <FgRoadStraightAtlasDual
+                  urlStraightA={ROAD_STRAIGHT_A_URL}
+                  urlStraightB={ROAD_STRAIGHT_B_URL}
+                  showStraightB={showStraightBRoad}
+                  slice={fgAtlasSlice}
+                  layoutWidthPx={r.widthPx}
+                  layoutHeightPx={fgRoadDisplayHeightPx}
                 />
               </div>
             ) : null}
@@ -432,17 +473,20 @@ export const ParallaxDrivePrototype = () => {
           left: `${fg1Pos.xPx}px`,
           bottom: `${REFERENCE_HEIGHT - fg1Pos.yPx - fg1Size.heightPx}px`,
           width: `${fg1Size.widthPx}px`,
-          height: `${fg1Size.heightPx}px`,
+          height: `${fg1DisplayHeightPx}px`,
           boxSizing: 'border-box',
           zIndex: Z_FG1,
         }}
         data-layer="fg-1"
         aria-hidden
       >
-        <FgRoadDualStretch
-          urlSet1={fg1RoadUrlPair.set1}
-          urlSet2={fg1RoadUrlPair.set2}
-          showSet2={useAlternateFgRoadSet}
+        <FgRoadStraightAtlasDual
+          urlStraightA={ROAD_STRAIGHT_A_URL}
+          urlStraightB={ROAD_STRAIGHT_B_URL}
+          showStraightB={showStraightBRoad}
+          slice={FG_STRAIGHT_ATLAS_SLICE_BY_STRIP_INDEX[1]}
+          layoutWidthPx={fg1Size.widthPx}
+          layoutHeightPx={fg1DisplayHeightPx}
         />
       </div>
 
