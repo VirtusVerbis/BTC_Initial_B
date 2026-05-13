@@ -18,7 +18,7 @@ import { computeShutterLadderRects } from './parallaxShutterLayout'
  * **Pitch / shutter**: ladder strips use `computeShutterLadderRects(pitch)` (constant seam band, blues vs greens share height).
  * Drag **up** → uphill (`pitch < 0`); drag **down** → downhill (`pitch > 0`). **Pointer release** eases `pitch` back to 0 (spring).
  * Drag **left** → positive `lateral`; drag **right** → negative `lateral` → BG1–BG6 `translateX` (differential parallax). Release eases `lateral` to 0 with the same spring as pitch.
- * **FG road art**: ladder `fg-2`…`fg-6` and wide `fg-1` show two stretched layers (`road_NNN.png` / `road_NNNa.png`); `opacity` toggles every `FG_ROAD_IMAGE_SET_ALTERNATION_MS` so both bitmaps stay mounted.
+ * **FG road art**: all FG layers `fg-1`…`fg-6` are absolutely positioned and show two stretched layers (`road_NNN.png` / `road_NNNa.png`); `opacity` toggles every `FG_ROAD_IMAGE_SET_ALTERNATION_MS` so both bitmaps stay mounted.
  * Spec: web/docs/stage-parallax-driving.md
  */
 
@@ -44,8 +44,9 @@ const ROAD_LIGHT: [number, number, number] = [52, 211, 103]
 const BG_STEPS = 6
 const FG_STEPS = 6
 
-/** BG5 furthest (layerIndex 0) … FG2 nearest (layerIndex 9); FG1 flex zone z-index 13. */
+/** BG5 furthest (layerIndex 0) … FG2 nearest (layerIndex 9); FG1 absolute strip z-index 13. */
 const Z_LADDER_BASE = 2
+const Z_FG1 = 13
 const Z_CAR = 15
 
 /** Interval between swapping FG road PNG sets (`road_XXX.png` vs `road_XXXa.png`) for motion illusion. */
@@ -158,50 +159,28 @@ const WideBand = ({
   dataLayer,
   translateXPx = 0,
   showCenterGuide = false,
-  imageSrc,
-  roadImagePair,
-  roadShowSet2,
 }: {
   color: string
   zIndex: number
   dataLayer: string
   translateXPx?: number
   showCenterGuide?: boolean
-  /** When set, image is stretched to fill the band (`background-size: 100% 100%`). Mutually exclusive with `roadImagePair`. */
-  imageSrc?: string
-  /** Two stretched layers; toggle `roadShowSet2` for motion without swapping `background-image`. */
-  roadImagePair?: FgRoadUrlPair
-  roadShowSet2?: boolean
-}) => {
-  const hasRoadDual = roadImagePair != null
-  const hasImage = Boolean(imageSrc) || hasRoadDual
-  return (
-    <div
-      className="parallax-prototype-band"
-      style={{
-        ...overscanFlexStyle,
-        ...(hasImage ? {} : { backgroundColor: color }),
-        ...(imageSrc && !hasRoadDual ? stretchedBackgroundFromUrl(imageSrc) : {}),
-        zIndex,
-        position: 'relative',
-        transform: translateXPx !== 0 ? `translateX(${translateXPx}px)` : 'none',
-      }}
-      data-layer={dataLayer}
-      aria-hidden
-    >
-      {hasRoadDual ? (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-          <FgRoadDualStretch
-            urlSet1={roadImagePair.set1}
-            urlSet2={roadImagePair.set2}
-            showSet2={Boolean(roadShowSet2)}
-          />
-        </div>
-      ) : null}
-      {showCenterGuide ? <ParallaxBgCenterGuide /> : null}
-    </div>
-  )
-}
+}) => (
+  <div
+    className="parallax-prototype-band"
+    style={{
+      ...overscanFlexStyle,
+      backgroundColor: color,
+      zIndex,
+      position: 'relative',
+      transform: translateXPx !== 0 ? `translateX(${translateXPx}px)` : 'none',
+    }}
+    data-layer={dataLayer}
+    aria-hidden
+  >
+    {showCenterGuide ? <ParallaxBgCenterGuide /> : null}
+  </div>
+)
 
 const isBgLadderStrip = (id: ParallaxLadderStripId): id is 'bg-5' | 'bg-4' | 'bg-3' | 'bg-2' | 'bg-1' =>
   id.startsWith('bg-')
@@ -368,6 +347,8 @@ export const ParallaxDrivePrototype = () => {
 
   const carPos = getParallaxPrototypeLayerPosition('car')
   const carSize = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT.car
+  const fg1Pos = getParallaxPrototypeLayerPosition('fg-1')
+  const fg1Size = PARALLAX_PROTOTYPE_LAYER_SIZE_DEFAULT['fg-1']
 
   return (
     <div className="parallax-prototype-root scene-placeholder" style={rootStyle}>
@@ -442,18 +423,27 @@ export const ParallaxDrivePrototype = () => {
         <div className="parallax-prototype-zone-bg-horizon parallax-prototype-bg-horizon" aria-hidden />
 
         <div className="parallax-prototype-zone-overlap-reserve" aria-hidden />
+      </div>
 
-        <div className="parallax-prototype-zone-fg parallax-prototype-fg-stack">
-          <div className="parallax-prototype-fg-fg1">
-            <WideBand
-              color={fgGreen(1)}
-              zIndex={0}
-              dataLayer="fg-1"
-              roadImagePair={fg1RoadUrlPair}
-              roadShowSet2={useAlternateFgRoadSet}
-            />
-          </div>
-        </div>
+      <div
+        className="parallax-prototype-band"
+        style={{
+          position: 'absolute',
+          left: `${fg1Pos.xPx}px`,
+          bottom: `${REFERENCE_HEIGHT - fg1Pos.yPx - fg1Size.heightPx}px`,
+          width: `${fg1Size.widthPx}px`,
+          height: `${fg1Size.heightPx}px`,
+          boxSizing: 'border-box',
+          zIndex: Z_FG1,
+        }}
+        data-layer="fg-1"
+        aria-hidden
+      >
+        <FgRoadDualStretch
+          urlSet1={fg1RoadUrlPair.set1}
+          urlSet2={fg1RoadUrlPair.set2}
+          showSet2={useAlternateFgRoadSet}
+        />
       </div>
 
       <div

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { REFERENCE_WIDTH } from '../config/constants'
+import { PARALLAX_STRIP_LEFT_REF_PX, PARALLAX_STRIP_WIDTH_REF_PX } from '../ui/parallaxPrototypeGeometry'
 import { PARALLAX_LADDER_STRIP_IDS } from '../ui/parallaxLadderIds'
 import {
   BG6_BOTTOM_SEAM_Y_PX,
@@ -51,5 +53,17 @@ describe('parallaxShutterLayout', () => {
   it('buildShutterLadderRectsAtBlueShare(0.5) matches neutral blue share', () => {
     const m = buildShutterLadderRectsAtBlueShare(0.5)
     expect(m['bg-5']!.heightPx).toBeCloseTo(SHUTTER_LADDER_NEUTRAL_RECTS['bg-5']!.heightPx, 5)
+  })
+
+  it('BG ladder strips keep 2× overscan; FG ladder strips match FG1 width at xPx=0', () => {
+    const m = computeShutterLadderRects(0)
+    for (const id of ['bg-5', 'bg-4', 'bg-3', 'bg-2', 'bg-1'] as const) {
+      expect(m[id]!.widthPx).toBe(PARALLAX_STRIP_WIDTH_REF_PX)
+      expect(m[id]!.xPx).toBe(PARALLAX_STRIP_LEFT_REF_PX)
+    }
+    for (const id of ['fg-6', 'fg-5', 'fg-4', 'fg-3', 'fg-2'] as const) {
+      expect(m[id]!.widthPx).toBe(REFERENCE_WIDTH)
+      expect(m[id]!.xPx).toBe(0)
+    }
   })
 })

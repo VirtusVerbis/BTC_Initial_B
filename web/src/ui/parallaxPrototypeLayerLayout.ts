@@ -95,8 +95,8 @@ export const PARALLAX_PROTOTYPE_LAYER_POSITION_DEFAULT = {
  * export const PARALLAX_PROTOTYPE_LAYER_POSITION_ADJUST = { car: { dxPx: 10, dyPx: -20 } }
  * ```
  *
- * Rendering note: ladder strips and the car read this map in `ParallaxDrivePrototype.tsx`.
- * WideBand layers (`bg-6`, `fg-1`) are still positioned by CSS flex unless wired to layout later.
+ * Rendering note: absolute layers (`bg-5`…`fg-2`, `fg-1`, `car`) read this map in `ParallaxDrivePrototype.tsx`.
+ * Only `bg-6` is still positioned by CSS flex (it uses the wide-band 2× overscan for lateral parallax).
  */
 export const PARALLAX_PROTOTYPE_LAYER_POSITION_ADJUST: Partial<
   Record<ParallaxPrototypeLayerId, { dxPx?: number; dyPx?: number }>

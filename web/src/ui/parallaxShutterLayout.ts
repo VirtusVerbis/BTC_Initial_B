@@ -4,7 +4,7 @@
  * `pitch > 0` = downhill (blues expand, greens collapse); `pitch < 0` = uphill (inverse).
  */
 
-import { REFERENCE_HEIGHT } from '../config/constants'
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../config/constants'
 import { FG_ZONE_FRAC, PARALLAX_STRIP_LEFT_REF_PX, PARALLAX_STRIP_WIDTH_REF_PX } from './parallaxPrototypeGeometry'
 import { type ParallaxLadderStripId } from './parallaxLadderIds'
 
@@ -44,8 +44,12 @@ export type ShutterLadderRect = {
   heightPx: number
 }
 
-const LADDER_STRIP_WIDTH_PX = PARALLAX_STRIP_WIDTH_REF_PX
-const LADDER_STRIP_X_PX = PARALLAX_STRIP_LEFT_REF_PX
+/** BG ladder strips keep 2× overscan so `lateralTranslateRefPx` can shift them without exposing seams. */
+const BLUE_STRIP_WIDTH_PX = PARALLAX_STRIP_WIDTH_REF_PX
+const BLUE_STRIP_X_PX = PARALLAX_STRIP_LEFT_REF_PX
+/** FG ladder strips match FG1's logical width (no lateral parallax → no overscan needed). */
+const GREEN_STRIP_WIDTH_PX = REFERENCE_WIDTH
+const GREEN_STRIP_X_PX = 0
 
 const BLUE_IDS: readonly ParallaxLadderStripId[] = ['bg-5', 'bg-4', 'bg-3', 'bg-2', 'bg-1']
 const GREEN_IDS: readonly ParallaxLadderStripId[] = ['fg-6', 'fg-5', 'fg-4', 'fg-3', 'fg-2']
@@ -69,11 +73,11 @@ export function buildShutterLadderRectsAtBlueShare(blueHeightShare: number): Rec
   const out = {} as Record<ParallaxLadderStripId, ShutterLadderRect>
   let y = BG6_BOTTOM_SEAM_Y_PX
   for (const id of BLUE_IDS) {
-    out[id] = { xPx: LADDER_STRIP_X_PX, yPx: y, widthPx: LADDER_STRIP_WIDTH_PX, heightPx: blueH }
+    out[id] = { xPx: BLUE_STRIP_X_PX, yPx: y, widthPx: BLUE_STRIP_WIDTH_PX, heightPx: blueH }
     y += blueH
   }
   for (const id of GREEN_IDS) {
-    out[id] = { xPx: LADDER_STRIP_X_PX, yPx: y, widthPx: LADDER_STRIP_WIDTH_PX, heightPx: greenH }
+    out[id] = { xPx: GREEN_STRIP_X_PX, yPx: y, widthPx: GREEN_STRIP_WIDTH_PX, heightPx: greenH }
     y += greenH
   }
   return out
